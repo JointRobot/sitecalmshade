@@ -7,7 +7,7 @@
 
 **Calm Shade** is an invite-only homestay collective ("where even crows, look like birds") for calm, taste-curated stays. Guests browse, chat, and book through one always-awake WhatsApp concierge (**wa.me/918799938193**); hosts keep 97% (platform takes 3% on confirmed bookings only). It began as 6 real Airbnb listings owned by Karthik (calmshet.com — links inside the file) and is built to grow globally through host-to-host invitations.
 
-**The entire product is ONE self-contained file:** `index.html` (~2.9 MB — media is base64-embedded; no build step, no dependencies, no framework). It is deploy-ready as-is.
+**The entire product is ONE self-contained file:** `index.html` (~2.9 MB — media is base64-embedded; no build step, no dependencies, no framework). It is deploy-ready as-is — **but as of this handover, `index.html` itself has not yet been added to this repo.** Adding it is the first blocking step; everything else below (proxy, README, .gitignore) is already committed and waiting on it. See §3.A.0.
 
 ### What works fully client-side (real, keep working)
 - Guest site: hero slideshow, editorial grid, filters/search, property pages with gallery + lightbox + walkthrough video
@@ -22,7 +22,7 @@
 ### What is SIMULATED (needs backend later — do NOT block launch on these)
 | Simulated | Current behavior | Production path (Phase 2) |
 |---|---|---|
-| AI concierge & AI curation | `fetch` to `api.anthropic.com` **without a key** — works only in Claude.ai preview; **in production these calls fail and the app gracefully falls back to canned replies** | See §5 — small server proxy with `ANTHROPIC_API_KEY` |
+| AI concierge & AI curation | Once `index.html` lands it will `fetch` `api.anthropic.com` directly, **without a key** — works only in Claude.ai preview; in production these calls fail and the app gracefully falls back to canned replies, until the 3 call sites are repointed at `api.php` | `api.php` proxy already committed (§3.D) — just needs `secrets.php` + the 3 URL swaps |
 | Data persistence | All state in memory; resets on refresh | Database (Supabase/Postgres) |
 | Login OTP | Code shown on screen (labelled as preview) | SMS/email gateway (MSG91/Twilio) |
 | WhatsApp messages to guests/hosts | In-page simulator | WhatsApp Business API on +91 8799938193 |
@@ -54,8 +54,9 @@ Conventions: full DOM re-render on every state change (all listeners are delegat
 ## 3. Your tasks, Claude Code (in order)
 
 ### A. GitHub
-1. Ask Karthik for: repo name (suggest `calm-shade`), public/private, and confirm the GitHub account (`gh auth login` if needed).
-2. Init repo with: `index.html`, this `HANDOVER.md`, a short `README.md` (one-paragraph pitch + "single-file app, deploy = copy index.html"), and `.gitignore` containing `secrets.php`, `.env`, `*.key`.
+0. **Blocking — `index.html` is missing from this repo.** `HANDOVER.md`, `README.md`, `.gitignore`, and `api.php` are already committed on `main`; `index.html` (the actual app, from the Claude chat build) has never been added. Get the file from Karthik (or the chat export) and commit it before doing anything else in this section — steps B–E all assume it exists at the repo root.
+1. Confirm with Karthik: repo name (currently `sitecalmshade`), public/private, and the GitHub account owning it.
+2. Once `index.html` lands, commit it at the repo root alongside the existing `HANDOVER.md`, `README.md`, `.gitignore`, `api.php`.
 3. Commit as `v1.0 — launch build (handover from Claude chat)` and push `main`.
 
 ### B. Hostinger deploy (choose per Karthik's plan)
@@ -68,9 +69,9 @@ Ask Karthik to provide (from **hPanel**): the target domain/subdomain, and eithe
 Karthik's main site (calmshet.com) is on **Wix**. Recommend: point a **subdomain** `shade.calmshet.com` (or `stay.calmshet.com`) at Hostinger — in Wix's domain DNS panel add an A record to the Hostinger server IP (hPanel shows it) or CNAME per Hostinger's docs — then link/embed it from Wix. If he prefers `calmshet.com/calmshade` on Wix itself, that's an iframe embed of the Hostinger URL instead. Confirm his choice before touching DNS; DNS may take up to ~1h.
 
 ### D. The ONE code change that matters for launch — AI proxy (§5)
-Without it the site still works (fallback replies), but the live concierge is the soul. Hostinger shared hosting runs **PHP**, so ship a tiny proxy:
+Without it the site still works (fallback replies), but the live concierge is the soul. Hostinger shared hosting runs **PHP**. **`api.php` is already committed at the repo root** — nothing to write here, just deploy and wire it:
 
-1. Create `api.php` next to index.html:
+1. `api.php` (already in the repo, ships as-is):
 
 ```php
 <?php // api.php — Anthropic proxy. Key lives in secrets.php (NOT in git).
@@ -85,9 +86,9 @@ curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,
 echo curl_exec($ch);
 ```
 
-2. `secrets.php` (upload manually via FTP, **never commit**): `<?php define('ANTHROPIC_KEY','sk-ant-…');`
-3. In `index.html`, replace **all three** occurrences of `https://api.anthropic.com/v1/messages` with `api.php` (they're in `askAI` and twice in `curateAI`). Keep the request bodies unchanged — the proxy passes them through. Add basic rate limiting later if abused.
-4. Ask Karthik for an Anthropic API key (console.anthropic.com); if he doesn't have one yet, ship without the proxy — fallbacks keep the site coherent.
+2. `secrets.php` still needs to be created (upload manually via FTP, **never commit**, already in `.gitignore`): `<?php define('ANTHROPIC_KEY','sk-ant-…');`
+3. Once `index.html` is added (§3.A.0), replace **all three** occurrences of `https://api.anthropic.com/v1/messages` with `api.php` (they're in `askAI` and twice in `curateAI`). Keep the request bodies unchanged — the proxy passes them through. Add basic rate limiting later if abused.
+4. Ask Karthik for an Anthropic API key (console.anthropic.com); if he doesn't have one yet, deploy without the proxy — fallbacks keep the site coherent.
 
 ### E. Launch checklist (test on the LIVE URL, desktop + phone)
 - [ ] Loads over HTTPS, loader plays, hero slideshow cycles
